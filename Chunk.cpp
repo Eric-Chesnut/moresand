@@ -124,23 +124,8 @@ void Chunk::CommitCells()
 	changes.clear();
 #undef _DEST
 
-	UpdateRect();
 	//***INCOMPLETE*** needed for update rect
 
-
-
-
-	//for (int x = m_minX; x < m_maxX; x++)
-	//for (int y = m_minY; y < m_maxY; y++) {
-	//	size_t i = x + y * m_width;
-
-	//	Cell& cell = GetCell(i, 1u);
-
-	//	if (cell.Type == CellType::EMPTY) continue;
-
-	//	SetCell(i, cell, SandField::CELL);
-	//	cell = Cell();
-	//}
 }
 
 

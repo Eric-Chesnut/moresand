@@ -397,16 +397,27 @@ void Update(SDL_Window* pWindow, SDL_Renderer* pRenderer, SDL_Texture* pTexture)
 
     theWorld.RemoveEmptyChunks();
 
+
+    // runs workers sim on each chunk
     for (int i = 0; i < size(theWorld.chunks); i++) {
         Chunk* chunk = theWorld.chunks[i];
         SimpleWorker(theWorld, chunk).UpdateChunk();
     }
 
+    // commits the changes
     for (int i = 0; i < size(theWorld.chunks); i++) {
         Chunk* chunk = theWorld.chunks[i];
         chunk->CommitCells();
     }
 
+    // updates the dirts rects
+    for (int i = 0; i < size(theWorld.chunks); i++) {
+        Chunk* chunk = theWorld.chunks[i];
+        chunk->UpdateRect();
+    }
+
+
+    
     DrawScreen(pWindow, pRenderer, pTexture);
 
     return;
