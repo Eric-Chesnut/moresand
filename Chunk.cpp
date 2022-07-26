@@ -11,6 +11,7 @@ Chunk::Chunk(int widtht, int heightt, int xt, int yt)
 	, filledCellCount(0)
 	, deleteMe(false)
 {
+	InitializeCells();
 	cells = new Cell[width * height];
 	Cell setCell = _EMPTY;
 
@@ -58,26 +59,29 @@ void Chunk::SetCell(int xs, int ys, const Cell& cell)
 //***INCOMPLETE*** come back to function down the line
 void Chunk::SetCell(int index, const Cell& cell)
 {
-	
+	KeepAlive(index);
 
 	Cell& dest = cells[index];
 	if (dest.Type == CellType::EMPTY && cell.Type != CellType::EMPTY) // Filling a cell
 	{
+		std::unique_lock lock(filledCellCountMutex); //lock filledCellCount
 		filledCellCount++;
 	}
 
 	else if (dest.Type != CellType::EMPTY && cell.Type == CellType::EMPTY) // Removing a filled cell
 		{
+			std::unique_lock lock(filledCellCountMutex); //lock filledCellCount
 			filledCellCount--;
 		}
 	dest = cell;
 
-	KeepAlive(index);
+	
 }
 
 
 void Chunk::MoveCell(Chunk* source, int xs, int ys, int xto, int yto)
 {
+	std::unique_lock lock(changesMutex); //lock the changes vector
 	changes.emplace_back(source, source->GetIndex(xs, ys), GetIndex(xto, yto));
 }
 
@@ -117,12 +121,24 @@ void Chunk::CommitCells()
 			SetCell(dst, chunk->GetCell(src));
 			chunk->SetCell(src, Cell());
 
+			if (iprev != i) //keep the ones that didn't get to move awake
+			{
+				for (int q = iprev; q <= i; q++)
+				{
+					auto [chunk, src, dst] = changes[q];
+					chunk->KeepAlive(src);
+					KeepAlive(dst);
+				}
+			}
+
+
 			iprev = i + 1;
 		}
 	}
 
 	changes.clear();
 #undef _DEST
+	//UpdateRect();
 
 	//***INCOMPLETE*** needed for update rect
 
@@ -162,6 +178,8 @@ void Chunk::KeepAlive(int index)
 {
 	int xt = index % width;
 	int yt = index / width;
+
+	std::unique_lock lock(workingRectMutex); //lock the working rect
 
 	minXt = std::clamp(std::min(xt - 2, minXt), 0, width);
 	minYt = std::clamp(std::min(yt - 2, minYt), 0, height);

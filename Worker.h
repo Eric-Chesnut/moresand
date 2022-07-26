@@ -24,4 +24,11 @@ public:
 	bool IsEmpty(int x, int y);
 
 	virtual void UpdateCell(int x, int y, Cell& cell) = 0;
+
+	void KeepAlive(int x, int y);
+
+	void _KeepAlive(int x, int y);
+
+	void DumbUpdateChunk();
+
 };

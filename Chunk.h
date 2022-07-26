@@ -6,6 +6,9 @@
 #include <vector>
 #include <mutex>
 #include <stdlib.h>     /* srand, rand */
+#include <chrono>
+#include <thread>
+#include <mutex>
 
 
 class Chunk;
@@ -24,6 +27,9 @@ private:
 	std::vector<std::tuple<Chunk*, int, int>> changes; // destination, source
 	int minXt, minYt, maxXt, maxYt; //working dirty rect
 	void InitializeCells();
+	std::mutex filledCellCountMutex; // locks for relevant functions
+	std::mutex changesMutex;
+	std::mutex workingRectMutex;
 public:
 	Chunk(int widtht, int heightt, int xt, int yt);
 	~Chunk();

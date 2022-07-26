@@ -9,6 +9,11 @@
 #include "Chunk.h"
 #include <unordered_map>
 #include "Hash.h"
+#include <chrono>
+#include <thread>
+#include <mutex>
+#include <concurrent_unordered_map.h>
+
 
 
 class World {
@@ -20,9 +25,12 @@ public:
 	const int worldH; // limit of the world in y direction
 
 private:
-	std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> chunkLookup;
+	// concurrent unordered map so it can safely be accessed by multiple threads
+	// is microsoft class
+	Concurrency::concurrent_unordered_map<std::pair<int, int>, Chunk*, pair_hash> chunkLookup;
 	Chunk* CreateChunk(std::pair<int, int> location);
-	
+	std::mutex chunkMutex; //chunk access mutex
+
 	
 
 public:
@@ -55,4 +63,6 @@ public:
 	Chunk* GetChunkL(std::pair<int, int> location);
 
 	void InitTheWorld();
+
+	void UpdateRect();
 };

@@ -33,6 +33,9 @@
     <ClInclude Include="SimpleWorker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Thread_Pool.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source.cpp">

@@ -150,6 +150,7 @@
     <ClInclude Include="Chunk.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="SimpleWorker.h" />
+    <ClInclude Include="Thread_Pool.hpp" />
     <ClInclude Include="Worker.h" />
     <ClInclude Include="World.h" />
   </ItemGroup>

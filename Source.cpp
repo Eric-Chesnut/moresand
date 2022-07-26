@@ -9,6 +9,13 @@
 #include <vector> 
 #include "SimpleWorker.h"
 
+
+
+
+//multithreading 
+#include "Thread_Pool.hpp" //thread pool
+
+
 using namespace std;
 
 //Screen dimension constants
@@ -19,11 +26,18 @@ constexpr static const int32_t RENDER_HEIGHT = SCREEN_HEIGHT;
 
 constexpr static const char* kWindowTitle = "Sand";
 
+//global thread pool
+BS::thread_pool pool;
+
+
 
 Cell _EMPTY, _SAND, _WATER, _ROCK;
 
 World theWorld = World(64, 64, (SCREEN_WIDTH / 64)-1, (SCREEN_HEIGHT / 64)-1); //holds the world, will need to change parameters 
 
+//int dumbCount = 0;
+
+//static int howDumb = 30000000000;
 
 //function prototypes
 
@@ -42,14 +56,6 @@ bool ProcessInput(); //processes inputs, returns true when exit has been selecte
 void Update(SDL_Window* pWindow, SDL_Renderer* pRenderer, SDL_Texture* pTexture); // the update function, runs every frame in PlayGame
 
 void PlayGame(SDL_Window* pWindow, SDL_Renderer* pRenderer, SDL_Texture* pTexture); // runs the game, calls update, processess inputs, and draws the screen
-
-void RunSim(); //runs the sand sim
-
-bool MoveSide(size_t x, size_t y, const Cell& cell); //checks if the object can move to the side, then adds it to the move que if it can
-
-bool MoveDownSide(size_t x, size_t y, const Cell& cell); //checks if the object can move down to the side, then adds it to the move que if it can
-
-bool MoveDown(size_t x, size_t y, const Cell& cell); //checks if the object can move down, then adds it to the move que if it can
 
 void InitializeCells();//sets up the global cells, the types of stuff that will be in the world
 
@@ -222,75 +228,6 @@ void DrawRect(SDL_Window* pWindow, SDL_Renderer* pRenderer, SDL_Texture* pTextur
 
 
 
-bool MoveDown(size_t x, size_t y, const Cell& cell)
-{
-    bool down = theWorld.IsEmpty(x, y + 1);
-    if (down) {
-        theWorld.MoveCell(x, y, x, y + 1);
-    }
-
-    return down;
-}
-
-bool MoveDownSide(size_t x, size_t y, const Cell& cell)
-{
-    bool downLeft = theWorld.IsEmpty(x - 1, y + 1);
-    bool downRight = theWorld.IsEmpty(x + 1, y + 1);
-
-    if (downLeft && downRight) {
-        downLeft = (rand() % 2) > 0;
-        downRight = !downLeft;
-    }
-
-    if (downLeft)  theWorld.MoveCell(x, y, x - 1, y + 1);
-    else if (downRight) theWorld.MoveCell(x, y, x + 1, y + 1);
-
-    return downLeft || downRight;
-}
-
-
-bool MoveSide(size_t x, size_t y, const Cell& cell)
-{
-    bool left = theWorld.IsEmpty(x - 1, y);
-    bool right = theWorld.IsEmpty(x + 1, y);
-
-    if (left && right) {
-        left = (rand() % 2) > 0;
-        right = !left;
-    }
-
-    if (left)  theWorld.MoveCell(x, y, x - 1, y);
-    else if (right) theWorld.MoveCell(x, y, x + 1, y);
-
-    return left || right;
-}
-
-
-//makes the sand fall
-void RunSim()
-{
-    for (int i = 0; i < size(theWorld.chunks); i++) {
-        Chunk* chunk = theWorld.chunks[i];
-        for (size_t x = 0; x < chunk->width; x++)
-            for (size_t y = 0; y < chunk->height; y++) {
-                Cell& cell = chunk->GetCell(x + y*chunk->width);
-
-                int px = x + (chunk->x);
-                int py = y + (chunk->y);
-
-                if (cell.Props & CellProperties::MOVE_DOWN && MoveDown(px, py, cell)) {}
-                else if (cell.Props & CellProperties::MOVE_DOWN_SIDE && MoveDownSide(px, py, cell)) {}
-                else if (cell.Props & CellProperties::MOVE_SIDE && MoveSide(px, py, cell)) {}
-            }
-    }
-
-    for (Chunk* chunk : theWorld.chunks) //commit changes
-    {
-        chunk->CommitCells();
-    }
-
-   
-}
 
 
 
@@ -373,7 +310,7 @@ void InitializeCells()
 
     _WATER = {
         CellType::WATER,
-        CellProperties::MOVE_DOWN | CellProperties::MOVE_SIDE,
+        CellProperties::MOVE_DOWN | CellProperties::MOVE_SIDE | CellProperties::MOVE_DOWN_SIDE,
         175, 200, 235
     };
 
@@ -398,23 +335,48 @@ void Update(SDL_Window* pWindow, SDL_Renderer* pRenderer, SDL_Texture* pTexture)
     theWorld.RemoveEmptyChunks();
 
 
-    // runs workers sim on each chunk
+   // if (dumbCount < howDumb && dumbCount > -100) // how often we check the whole chunk for bits left behind
+    //{
+        /*
+        // runs workers sim on each chunk
+        for (int i = 0; i < size(theWorld.chunks); i++) {
+            Chunk* chunk = theWorld.chunks[i];
+            SimpleWorker(theWorld, chunk).UpdateChunk();
+        }
+        dumbCount++;
+        */
+    
     for (int i = 0; i < size(theWorld.chunks); i++) {
-        Chunk* chunk = theWorld.chunks[i];
-        SimpleWorker(theWorld, chunk).UpdateChunk();
-    }
+         Chunk* chunk = theWorld.chunks[i];
+         pool.push_task([&, chunk]() {
+                SimpleWorker(theWorld, chunk).UpdateChunk();
+              });
+       }
+    //}
+    /*else
+    {
+        // runs workers dumb sim on each chunk
+        for (int i = 0; i < size(theWorld.chunks); i++) {
+            Chunk* chunk = theWorld.chunks[i];
+            SimpleWorker(theWorld, chunk).DumbUpdateChunk();
+        }
+        dumbCount = 0;
+        
+    }*/
+    pool.wait_for_tasks(); //wait for threads to finish updating cells
 
     // commits the changes
     for (int i = 0; i < size(theWorld.chunks); i++) {
         Chunk* chunk = theWorld.chunks[i];
-        chunk->CommitCells();
+        //chunk->CommitCells();
+        pool.push_task([&, chunk]() {
+            chunk->CommitCells();
+            });
     }
+    pool.wait_for_tasks(); 
 
     // updates the dirts rects
-    for (int i = 0; i < size(theWorld.chunks); i++) {
-        Chunk* chunk = theWorld.chunks[i];
-        chunk->UpdateRect();
-    }
+    theWorld.UpdateRect();
 
 
     

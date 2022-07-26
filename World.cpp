@@ -72,12 +72,7 @@ void World::KeepAlive(int x, int y)
 
 std::pair<int, int> World::GetChunkLocation(int x, int y)
 {
-	return {
-		//(x >= 0 ? x : x - m_chunkWidth  - 1) / m_chunkWidth, // credit to Peace Roasted in the yt comments
-		//(y >= 0 ? y : y - m_chunkHeight - 1) / m_chunkHeight // minor change for readability 
-		floor(float(x) / chunkWidth),
-		floor(float(y) / chunkHeight) // this is from minecraft i think
-	};
+	return {floor(float(x) / chunkWidth),floor(float(y) / chunkHeight) };
 }
 
 
@@ -90,11 +85,8 @@ Chunk* World::GetChunk(int x, int y)
 Chunk* World::GetChunkL(std::pair<int, int> location)
 {
 	Chunk* chunk = GetChunkDirect(location);
-	if (!chunk) {
-		chunk = CreateChunk(location);
-	}
+	return chunk ? chunk : CreateChunk(location);
 
-	return chunk;
 }
 
 Chunk* World::GetChunkDirect(std::pair<int, int> location)
@@ -125,6 +117,8 @@ Chunk* World::CreateChunk(std::pair<int, int> location)
 
 	chunkLookup.insert({ location, chunk });
 
+	std::unique_lock lock(chunkMutex); // lock chunks
+
 	chunks.push_back(chunk);
 
 	return chunk;
@@ -138,22 +132,22 @@ void World::RemoveEmptyChunks() {
 	for (size_t i = 0; i < chunks.size(); i++) {
 		Chunk* chunk = chunks.at(i);
 
-		if (chunk->filledCellCount == 0 ) //delay by one frame, may have been my problem before
+		if (chunk->filledCellCount == 0 && chunk->deleteMe == false) //delay by one frame, may have been my problem before
 		{
 			chunk->deleteMe = true;
-			//continue;
+			continue;
 		}
-
+		/*
 		if (chunk->filledCellCount != 0)
 		{
 			chunk->deleteMe = false;
 			continue;
-		}
+		}*/
 
 		if (chunk->deleteMe) 
 		{
 			
-			chunkLookup.erase(GetChunkLocation(chunk->x, chunk->y));
+			chunkLookup.unsafe_erase(GetChunkLocation(chunk->x, chunk->y));
 			chunks[i] = chunks.back(); chunks.pop_back();
 			i--;
 
@@ -172,5 +166,14 @@ void World::InitTheWorld()
 		{
 			CreateChunk({ x, y });
 		}
+	}
+}
+
+
+void World::UpdateRect()
+{
+	for (int i = 0; i < size(chunks); i++) {
+		Chunk* chunk = chunks[i];
+		chunk->UpdateRect();
 	}
 }
